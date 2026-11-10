@@ -1,0 +1,56 @@
+# docker-compose.yml
+# Uso: docker compose up -d  (levanta Postgres + backend + frontend)
+#      docker compose down -v  (para y borra volúmenes)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: miapp-postgres
+    environment:
+      POSTGRES_DB: miapp
+      POSTGRES_USER: miapp
+      POSTGRES_PASSWORD: miapp
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miapp -d miapp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev   # ver abajo
+    container_name: miapp-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/miapp
+      SPRING_DATASOURCE_USERNAME: miapp
+      SPRING_DATASOURCE_PASSWORD: miapp
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports: ["8080:8080"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - maven-cache:/root/.m2
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: miapp-frontend
+    ports: ["4200:4200"]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on: [backend]
+
+volumes:
+  pgdata:
+  maven-cache:
